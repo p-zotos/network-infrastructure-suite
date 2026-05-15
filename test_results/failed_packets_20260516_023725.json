@@ -1,0 +1,82 @@
+[
+    {
+        "timestamp": "2026-05-16T02:37:23.746830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 1900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:23.846830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 2900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:23.946830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 3900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:24.046830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 4900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:24.146830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 5900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:24.246830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 6900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:24.346830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 7900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:24.446830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 8900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:24.546830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 9900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    },
+    {
+        "timestamp": "2026-05-16T02:37:24.646830",
+        "source": "192.168.1.50",
+        "destination": "172.217.16.142",
+        "sequence_number": 10900,
+        "retransmit_delay_ms": 50.0,
+        "window_size": 8192
+    }
+]
