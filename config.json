@@ -1,0 +1,24 @@
+{
+  "modes": {
+    "normal": {
+      "pcap_path": "mock_data/mock_normal_data.pcap",
+      "retrans_threshold": 2.0,
+      "condition": "less_than"
+    },
+    "stress": {
+      "pcap_path": "mock_data/mock_stress_data.pcap",
+      "retrans_threshold": 5.0,
+      "condition": "greater_than_or_equal"
+    },
+    "real": {
+      "pcap_path": "pcaps/real_traffic.pcap",
+      "retrans_threshold": 1.0,
+      "condition": "less_than"
+    },
+    "exploratory": {
+      "pcap_path": "mock_data/mock_exploratory_data.pcap",
+      "retrans_threshold": 3.0,
+      "condition": "less_than"
+    }
+  }
+}

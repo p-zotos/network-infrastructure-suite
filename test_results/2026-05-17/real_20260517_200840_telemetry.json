@@ -1,0 +1,33 @@
+{
+    "network_metrics": {
+        "execution_time": "2026-05-17T20:08:40.459855",
+        "mode": "real",
+        "total_tcp_packets": 18,
+        "total_retransmissions": 2,
+        "retransmission_rate_percent": 11.11,
+        "is_clean_close": false,
+        "is_connection_failed": false
+    },
+    "infrastructure_visibility": {
+        "cpu_utilization_percent": 83.3,
+        "ram_utilization_percent": 76.4
+    },
+    "failed_packets": [
+        {
+            "timestamp": "2026-05-16T11:59:20.252233",
+            "source": "34.120.177.193",
+            "destination": "192.168.206.130",
+            "sequence_number": 1774789037,
+            "retransmit_delay_ms": 69.06,
+            "window_size": 64240
+        },
+        {
+            "timestamp": "2026-05-16T11:59:20.337692",
+            "source": "34.120.177.193",
+            "destination": "192.168.206.130",
+            "sequence_number": 1774792681,
+            "retransmit_delay_ms": 83.4,
+            "window_size": 64240
+        }
+    ]
+}

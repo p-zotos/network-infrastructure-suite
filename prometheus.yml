@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 1s # Offensive for real-time QA feedback
+
+scrape_configs:
+  - job_name: 'pushgateway'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']

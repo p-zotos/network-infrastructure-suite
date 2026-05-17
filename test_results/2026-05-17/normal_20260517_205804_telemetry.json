@@ -1,0 +1,16 @@
+{
+    "network_metrics": {
+        "execution_time": "2026-05-17T20:58:04.981086",
+        "mode": "normal",
+        "total_tcp_packets": 51,
+        "total_retransmissions": 0,
+        "retransmission_rate_percent": 0.0,
+        "is_clean_close": true,
+        "is_connection_failed": false
+    },
+    "infrastructure_visibility": {
+        "cpu_utilization_percent": 62.5,
+        "ram_utilization_percent": 71.5
+    },
+    "failed_packets": []
+}
