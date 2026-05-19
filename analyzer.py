@@ -141,7 +141,7 @@ class NetworkAnalyzer:
             f"qa_infra_ram_utilization{{mode=\"{user_mode}\"}} {self.ram_usage}\n"
         )
         
-        url = "http://localhost:9091/metrics/job/network_qa_suite"
+        url = f"http://localhost:9091/metrics/job/network_qa_suite/mode/{user_mode}"
         try:
             req = urllib.request.Request(
                 url, 

@@ -1,0 +1,97 @@
+{
+    "network_metrics": {
+        "execution_time": "2026-05-19T01:00:25.191144",
+        "mode": "stress",
+        "total_tcp_packets": 111,
+        "total_retransmissions": 10,
+        "retransmission_rate_percent": 9.01,
+        "is_clean_close": true,
+        "is_connection_failed": false
+    },
+    "infrastructure_visibility": {
+        "cpu_utilization_percent": 73.3,
+        "ram_utilization_percent": 79.1
+    },
+    "failed_packets": [
+        {
+            "timestamp": "2026-05-19T01:00:22.058168",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 1900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.158169",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 2900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.258168",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 3900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.358169",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 4900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.458169",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 5900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.558168",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 6900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.658169",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 7900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.758168",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 8900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.858169",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 9900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        },
+        {
+            "timestamp": "2026-05-19T01:00:22.958169",
+            "source": "192.168.1.50",
+            "destination": "172.217.16.142",
+            "sequence_number": 10900,
+            "retransmit_delay_ms": 50.0,
+            "window_size": 8192
+        }
+    ]
+}
