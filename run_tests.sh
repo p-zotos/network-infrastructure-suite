@@ -33,11 +33,14 @@ echo "=================================================="
 if [ "$1" == "real" ]; then
     echo "[*] Real Mode Selected. Initializing live network telemetry capture..."
 
-    # Run the sniffer with sudo to hook network interface frames.
-    # Override with e.g. CAPTURE_DURATION=30 CAPTURE_INTERFACE=eth0 ./run_tests.sh real
+    # Run the sniffer with sudo to hook network interface frames. It generates its own
+    # HTTPS traffic once sniffing has started (CAPTURE_PASSIVE=1 to capture existing traffic only).
+    # Override with e.g. CAPTURE_DURATION=30 CAPTURE_INTERFACE=eth0 CAPTURE_TARGET_URL=https://github.com
     sudo -E venv/bin/python3 capture_traffic.py \
         --duration "${CAPTURE_DURATION:-15}" \
-        ${CAPTURE_INTERFACE:+--interface "$CAPTURE_INTERFACE"}
+        ${CAPTURE_INTERFACE:+--interface "$CAPTURE_INTERFACE"} \
+        ${CAPTURE_TARGET_URL:+--target-url "$CAPTURE_TARGET_URL"} \
+        ${CAPTURE_PASSIVE:+--passive}
 
     echo -e "\n[*] Analyzing captured E2E production footprint..."
     pytest test_network.py -v -k "real"

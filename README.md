@@ -140,13 +140,15 @@ A degraded link where 1 in 10 segments is retransmitted after a 50 ms timeout. V
 
 ### 3. Real Mode (Live Capture)
 
-Sniffs live TCP traffic from the default interface for 15 seconds, then analyzes it. The real profile is skipped automatically when no capture exists.
+Starts a live sniffer on the default interface. Once the sniffer is running, it generates its own HTTPS traffic for 15 seconds, so every capture contains complete TCP sessions. It then analyzes the capture. IPv4 and IPv6 are both supported. The real profile is skipped automatically when no capture exists.
 
-> ⚠️ Note: Requires root privileges to access the network interface.
+> ⚠️ Note: Requires root privileges to access the network interface. Captures contain your real traffic and are git-ignored.
 
 ```bash
 ./run_tests.sh real
 CAPTURE_INTERFACE=ens33 CAPTURE_DURATION=30 ./run_tests.sh real
+CAPTURE_TARGET_URL=https://github.com ./run_tests.sh real   # different endpoint
+CAPTURE_PASSIVE=1 ./run_tests.sh real                       # existing traffic only
 ```
 
 ### 4. Exploratory Mode (Seeded Network Fuzzing)
@@ -189,6 +191,7 @@ Each profile run pushes its latest metrics to the Pushgateway (grouped by `mode`
 | `GRAFANA_ADMIN_PASSWORD` | `admin` | Grafana admin password (can be set in a `.env` file). |
 | `SEED` | random | Replay a specific exploratory fuzzing run. |
 | `CAPTURE_INTERFACE` / `CAPTURE_DURATION` | default route / `15` | Live capture settings for real mode. |
+| `CAPTURE_TARGET_URL` / `CAPTURE_PASSIVE` | `https://example.com` / unset | Endpoint for generated traffic, or set `CAPTURE_PASSIVE=1` to capture existing traffic only. |
 
 Grafana uses file-based provisioning to register both the datasource and the dashboard when the container boots, so there are no manual UI imports:
 

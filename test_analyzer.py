@@ -1,6 +1,6 @@
 """Unit tests for the analyzer engine against hand-crafted captures with known ground truth."""
 import pytest
-from scapy.all import IP, TCP, Raw, wrpcap
+from scapy.all import IP, IPv6, IPv6ExtHdrDestOpt, TCP, Raw, wrpcap
 from analyzer import NetworkAnalyzer
 
 CLIENT, SERVER = "10.0.0.50", "203.0.113.10"
@@ -77,6 +77,19 @@ def test_stable_cadence_has_zero_jitter_and_spike_is_measured(analyze):
 
     spiky = analyze([segment(0.00, 1000), segment(0.01, 1100), segment(0.32, 1200)])
     assert spiky["max_jitter_ms"] == pytest.approx(300.0, abs=0.01)
+
+
+def test_ipv6_flows_with_extension_headers_are_analyzed(analyze):
+    def v6(t, seq, size, flags="PA"):
+        pkt = IPv6(src="2001:db8::1", dst="2001:db8::2") / IPv6ExtHdrDestOpt() / TCP(sport=54321, dport=443, seq=seq, flags=flags)
+        pkt = pkt / Raw(load=bytes(size)) if size else pkt
+        pkt.time = t
+        return pkt
+
+    packets = [v6(0.00, 1000, 100), v6(0.05, 1100, 0, flags="A"), v6(0.10, 1100, 0, flags="A"), v6(0.30, 1000, 100)]
+    metrics = analyze(packets)
+    assert metrics["data_segments"] == 2
+    assert metrics["total_retransmissions"] == 1
 
 
 def test_capture_without_tcp_data_returns_none(analyze):

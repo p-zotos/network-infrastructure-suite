@@ -4,7 +4,7 @@ import statistics
 import psutil
 from datetime import datetime
 from pathlib import Path
-from scapy.all import PcapReader, IP, TCP
+from scapy.all import PcapReader, IP, IPv6, TCP
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -16,6 +16,17 @@ SEQ_MOD = 2**32
 def seq_before(a, b):
     """True if sequence number `a` precedes `b`, accounting for 32-bit wraparound (RFC 1982)."""
     return a != b and ((b - a) % SEQ_MOD) < SEQ_MOD // 2
+
+
+def tcp_payload_length(pkt):
+    """TCP payload size derived from the IP header, so Ethernet padding is never counted as data."""
+    tcp = pkt[TCP]
+    if IP in pkt:
+        return pkt[IP].len - pkt[IP].ihl * 4 - tcp.dataofs * 4
+    # IPv6 payload length also covers any extension headers sitting between IPv6 and TCP
+    ip6 = pkt[IPv6]
+    extension_headers_len = len(ip6.payload) - len(tcp)
+    return ip6.plen - extension_headers_len - tcp.dataofs * 4
 
 
 class FlowState:
@@ -72,10 +83,11 @@ class NetworkAnalyzer:
         # Stream the trace packet by packet so large captures never have to fit in memory
         with PcapReader(str(self.pcap_path)) as packets:
             for pkt in packets:
-                if IP not in pkt or TCP not in pkt:
+                if TCP not in pkt or (IP not in pkt and IPv6 not in pkt):
                     continue
                 total_tcp_packets += 1
 
+                ip = pkt[IP] if IP in pkt else pkt[IPv6]
                 tcp = pkt[TCP]
                 flags = tcp.flags
                 timestamp = float(pkt.time)
@@ -87,13 +99,12 @@ class NetworkAnalyzer:
 
                 # Only segments that consume sequence space can be retransmitted.
                 # Pure ACKs legitimately repeat the same seq number and are skipped.
-                # Payload size comes from the IP header: Ethernet padding is not TCP data.
-                payload_len = pkt[IP].len - pkt[IP].ihl * 4 - tcp.dataofs * 4
+                payload_len = tcp_payload_length(pkt)
                 seg_len = payload_len + ("S" in flags) + ("F" in flags)
                 if seg_len <= 0:
                     continue
 
-                flow = flows.setdefault((pkt[IP].src, tcp.sport, pkt[IP].dst, tcp.dport), FlowState())
+                flow = flows.setdefault((ip.src, tcp.sport, ip.dst, tcp.dport), FlowState())
                 seq_num = tcp.seq
 
                 delay_ms = None
@@ -119,8 +130,8 @@ class NetworkAnalyzer:
                     retransmissions_count += 1
                     failed_packets_metrics.append({
                         "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
-                        "source": f"{pkt[IP].src}:{tcp.sport}",
-                        "destination": f"{pkt[IP].dst}:{tcp.dport}",
+                        "source": f"{ip.src}:{tcp.sport}",
+                        "destination": f"{ip.dst}:{tcp.dport}",
                         "sequence_number": seq_num,
                         "retransmit_delay_ms": round(delay_ms, 2),
                         "window_size": tcp.window
