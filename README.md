@@ -1,7 +1,9 @@
 # Network Infrastructure QA & Telemetry Suite
 
-A robust, automated Quality Assurance framework designed to capture, analyze, and monitor network traffic patterns on Debian-based virtual environments.
-This suite supports multi-mode execution—spanning pristine deterministic baselines, high-load stress profiles, real-world live wire captures, and randomized fuzzing vectors—and pipes the resulting telemetry directly into a Prometheus and Grafana visualization stack.
+[![Network QA Suite](https://github.com/p-zotos/network-infrastructure-suite/actions/workflows/tests.yml/badge.svg)](https://github.com/p-zotos/network-infrastructure-suite/actions/workflows/tests.yml)
+
+An automated Quality Assurance framework that captures, analyzes and monitors TCP traffic on Debian-based environments.
+It runs deterministic baselines, high-load stress profiles, seeded fuzzing and live wire captures, and streams the resulting telemetry into a Prometheus + Grafana stack.
 
 ---
 
@@ -9,10 +11,40 @@ This suite supports multi-mode execution—spanning pristine deterministic basel
 
 The suite operates as a decoupled data-acquisition and test-assertion pipeline:
 
-1. **Traffic Generation / Capture:** Scripts compile raw packet data into industry-standard `.pcap` binaries using Scapy.
-2. **Analysis Engine:** Processes packet frames to evaluate metrics like duplicate sequence numbers (retransmissions), arrival jitter, and out-of-order execution flags.
-3. **Automated Verification:** A PyTest harness correlates data metrics against profile thresholds configured via a central JSON matrix.
-4. **Telemetry Hub:** The test cycle exposes or pushes metrics to Prometheus, populating a dynamic Grafana dashboard tracking infrastructure reliability.
+1. **Traffic Generation / Capture:** Scapy builds realistic TCP sessions (3-way handshake, data segments, delayed ACKs, FIN teardown) into `.pcap` files, or sniffs live traffic from a network interface.
+2. **Analysis Engine (`analyzer.py`):** Streams the capture and tracks **per-flow TCP state** to measure retransmissions, out-of-order segments, arrival jitter and connection teardown.
+3. **Automated Verification:** Two PyTest layers. Unit tests prove the analyzer is correct, and profile tests assert each traffic profile against thresholds in `config.json`.
+4. **Telemetry Hub:** Every profile run pushes its metrics to a Prometheus Pushgateway, which feeds a provisioned Grafana dashboard.
+
+```text
+ generators / live sniffer ──► .pcap ──► NetworkAnalyzer ──► PyTest assertions
+                                               │                    │
+                                               ▼                    ▼
+                                    JSON report (test_results/)  Pushgateway ──► Prometheus ──► Grafana
+```
+
+---
+
+## 🔬 What the Analyzer Measures
+
+| Metric | How it is computed |
+|---|---|
+| **Retransmissions** | A data segment whose sequence number was already seen *in the same flow* (src/dst IP **and** port). Pure ACKs carry no sequence space and are never counted. |
+| **Out-of-order segments** | New data that starts below the highest sequence number already observed for the flow. |
+| **Capture duplicates** | Identical segments seen again within 5 ms (e.g. the same frame captured twice on loopback). Reported but excluded from retransmissions. |
+| **Arrival jitter** | Mean / max variation between consecutive inter-arrival times of data segments (IPDV, RFC 3393). |
+| **Clean close / reset** | Presence of FIN and RST flags. |
+
+Rates are calculated against **data segments** (segments with payload, SYN or FIN), the same way Wireshark's `tcp.analysis` does. Sequence comparisons handle 32-bit wraparound (RFC 1982). Payload length comes from the IP header, so Ethernet padding is never mistaken for data.
+
+---
+
+## 🧪 Test Strategy
+
+| Layer | File | Purpose |
+|---|---|---|
+| **Analyzer unit tests** | `test_analyzer.py` | Hand-crafted captures with exact expected results: pure-ACK immunity, flow separation by port, retransmission vs. out-of-order, capture-duplicate filter, sequence wraparound, jitter. |
+| **Profile tests** | `test_network.py` | Runs each profile from `config.json` through the analyzer and asserts its thresholds. Exploratory captures are checked against the generator's **ground truth**. |
 
 ---
 
@@ -20,23 +52,31 @@ The suite operates as a decoupled data-acquisition and test-assertion pipeline:
 
 ```text
 .
-├── config.json                     # Global orchestration matrix & threshold limits
-├── test_network.py                 # PyTest assertion suite & Prometheus metric exporter
-├── capture_traffic.py              # Raw socket sniffing utility for live-wire execution
+├── analyzer.py                     # Per-flow TCP analysis engine & Pushgateway exporter
+├── config.json                     # Profile matrix & threshold limits
+├── test_analyzer.py                # Analyzer unit tests (known ground truth)
+├── test_network.py                 # Profile assertion suite
+├── capture_traffic.py              # Live sniffer for real-mode execution (Scapy)
+├── generate_real_pcap.sh           # Alternative live capture using tshark
 ├── run_tests.sh                    # Automated shell controller wrapper
-├── mock_generation_scripts/        # Synthetic PCAP generation utilities
-│   └── generate_exploratory_mock_pcap.py  # Fuzzing engine simulating organic network anomalies
-└── mock_data/                      # Binary target directories for generated packet captures
-    └── mock_exploratory_data.pcap
+├── mock_generation_scripts/
+│   ├── tcp_session.py              # Realistic TCP session builder shared by generators
+│   ├── generate_normal_mock_pcap.py
+│   ├── generate_stress_mock_pcap.py
+│   └── generate_exploratory_mock_pcap.py  # Seeded fuzzer + ground-truth manifest
+├── docker-compose.yml              # Prometheus, Pushgateway, Grafana
+├── prometheus.yml
+├── grafana/                        # Provisioned datasource & dashboard
+└── .github/workflows/tests.yml     # CI: generate captures, run the full suite
 ```
+
+Generated artifacts (`mock_data/`, `pcaps/`, `test_results/`) are rebuilt on every run and are not version controlled.
 
 ---
 
 ## ⚙️ Configuration Management (`config.json`)
 
-System behavior and validation thresholds are managed entirely within `config.json`.
-
-The framework maps metrics dynamically using the following structure:
+System behavior and validation thresholds are managed entirely within `config.json`:
 
 ```json
 {
@@ -54,26 +94,37 @@ The framework maps metrics dynamically using the following structure:
     "real": {
       "pcap_path": "pcaps/real_traffic.pcap",
       "retrans_threshold": 1.0,
-      "condition": "less_than"
+      "condition": "less_than",
+      "require_clean_close": false
     },
     "exploratory": {
       "pcap_path": "mock_data/mock_exploratory_data.pcap",
-      "retrans_threshold": 3.0,
-      "condition": "less_than"
+      "ground_truth_path": "mock_data/mock_exploratory_data.truth.json",
+      "condition": "matches_ground_truth"
     }
   }
 }
 ```
 
+| Key | Meaning |
+|---|---|
+| `condition` | `less_than`, `greater_than_or_equal` (compared with `retrans_threshold`) or `matches_ground_truth`. Unknown values fail the test. |
+| `require_clean_close` | Assert a FIN was observed (default `true`). Disabled for live captures, where a capture window rarely contains a full session. |
+
 ---
 
 ## 🚀 Execution Profiles
 
-The wrapper controller `./run_tests.sh` accepts a target execution profile as an argument or execute them all if none provided.
+`./run_tests.sh` creates the virtual environment if needed, installs `requirements.txt` and regenerates the mock captures. With no argument it runs the full suite (unit tests plus all profiles).
+
+```bash
+./run_tests.sh          # everything
+./run_tests.sh unit     # analyzer unit tests only
+```
 
 ### 1. Normal Mode
 
-Validates standard network expectations against a clean, zero-jitter scenario with predictable sequence counts.
+A clean session with a stable 10 ms cadence, zero retransmissions and zero jitter. Asserts a retransmission rate **below 2%**.
 
 ```bash
 ./run_tests.sh normal
@@ -81,7 +132,7 @@ Validates standard network expectations against a clean, zero-jitter scenario wi
 
 ### 2. Stress Mode
 
-Evaluates systemic behavior under sustained, highly dense traffic streams to determine resilience boundaries.
+A degraded link where 1 in 10 segments is retransmitted after a 50 ms timeout. Verifies the suite **flags** the degradation (rate **≥ 5%**).
 
 ```bash
 ./run_tests.sh stress
@@ -89,109 +140,72 @@ Evaluates systemic behavior under sustained, highly dense traffic streams to det
 
 ### 3. Real Mode (Live Capture)
 
-Bypasses faked environments by spinning up a raw network sniffer directly on the local machine interface for 15 seconds. (WorkInProgress)
+Sniffs live TCP traffic from the default interface for 15 seconds, then analyzes it. The real profile is skipped automatically when no capture exists.
 
-> ⚠️ Note: Requires elevated privileges to interface with network hardware.
+> ⚠️ Note: Requires root privileges to access the network interface.
 
 ```bash
 ./run_tests.sh real
+CAPTURE_INTERFACE=ens33 CAPTURE_DURATION=30 ./run_tests.sh real
 ```
 
-### 4. Exploratory Mode (Network Fuzzing)
+### 4. Exploratory Mode (Seeded Network Fuzzing)
 
-Runs a synthetic generation pass that injects random packet counts (between 50 and 200), randomizes socket identities, and exposes the framework to three organic network anomalies:
+Generates a random session (50–200 data segments, random socket identities and segment sizes) with three organic anomalies:
 
-- **Packet Drops / Retransmissions:** Injects random duplicate frame weights.
-- **Out-of-Order Delivery:** Swaps timeline stamps to simulate misrouted packets.
-- **Jitter Spikes:** Artificially introduces random 200ms–500ms server processing lags.
+- **Fast retransmissions (6%):** re-sends the segment from three positions back, as after three duplicate ACKs.
+- **Out-of-order delivery (3%):** a segment is overtaken on the wire by the next one.
+- **Jitter spikes (4%):** sudden 200–500 ms routing delays.
+
+The generator writes a **ground-truth manifest** of the anomalies it injected, and the test asserts that the analyzer detects exactly those counts. Every run prints its seed, so a failure can be replayed exactly:
 
 ```bash
 ./run_tests.sh exploratory
+SEED=42 ./run_tests.sh exploratory
 ```
 
 ---
 
 ## 📊 Grafana & Prometheus Telemetry Integration
 
-The Network Infrastructure QA & Telemetry Suite leverages a fully automated containerized stack to capture, parse, and visualize traffic and host behavior patterns during automated test executions. When `rn_tests.sh` runs, telemetry hooks emit data streams directly into Prometheus, which are instantly mirrored to a persistent, provisioned Grafana dashboard.
+```bash
+docker compose up -d     # Grafana: http://localhost:3000 (admin / admin)
+./run_tests.sh
+```
 
----
+All three services are bound to `127.0.0.1`, so they are not reachable from the local network (the Pushgateway accepts unauthenticated writes). If the stack runs inside a VM, reach Grafana from the host via an SSH tunnel (`ssh -L 3000:localhost:3000 user@vm`) or VS Code Remote-SSH port forwarding.
 
-## 🚀 Architecture Overview
+Each profile run pushes its latest metrics to the Pushgateway (grouped by `mode`), which Prometheus scrapes every second. The provisioned **QA Network Infrastructure Suite** dashboard (folder *QA Infrastructure*) shows:
 
-1. **Traffic & Host Scrapers:**  
-   Active processes monitor retransmission rates, CPU footprint, and test outcome states, exposing them as Prometheus-compliant metrics.
+- Retransmission rate per mode (green < 2%, yellow < 5%, red ≥ 5%)
+- PASS / FAIL status per mode
+- Out-of-order rate and mean jitter
+- Test runner host CPU / RAM footprint
+- Time since the last run
 
-2. **Prometheus Data Layer:**  
-   Collects and stores time-series data scraped from the suite's execution endpoints.
+| Environment variable | Default | Purpose |
+|---|---|---|
+| `PUSHGATEWAY_URL` | `localhost:9091` | Pushgateway target. Set to an empty string to disable pushing (as CI does). |
+| `GRAFANA_ADMIN_PASSWORD` | `admin` | Grafana admin password (can be set in a `.env` file). |
+| `SEED` | random | Replay a specific exploratory fuzzing run. |
+| `CAPTURE_INTERFACE` / `CAPTURE_DURATION` | default route / `15` | Live capture settings for real mode. |
 
-3. **Automated Provisioning:**  
-   Grafana uses file-based configuration layout providers to register the telemetry dashboard automatically upon container boot (`docker compose up`), completely eliminating manual UI import procedures.
-
----
-
-## 📂 Directory & Deployment Structure
-
-To ensure configuration persistence across `docker compose down` cycles, assets are arranged locally inside the project workspace as follows:
+Grafana uses file-based provisioning to register both the datasource and the dashboard when the container boots, so there are no manual UI imports:
 
 ```text
-.
-├── docker-compose.yml
-├── run_tests.sh
-└── grafana/
-    ├── provisioning/
-    │   └── dashboards/
-    │       └── dashboards.yaml       # Defines dashboard file providers for Grafana
-    └── dashboards/
-        └── network_dashboard.json    # The core dashboard layout configuration
-```
-
----
-
-## ⚙️ Provisioning Configurations
-
-### 1. The Provider Manifest  
-`grafana/provisioning/dashboards/dashboards.yaml`
-
-This file instructs Grafana's core initialization engine to poll local disk storage inside the container path for dashboard objects:
-
-```yaml
-apiVersion: 1
-
-providers:
-  - name: 'My QA Dashboards'
-    orgId: 1
-    folder: 'QA Infrastructure'
-    type: file
-    disableDeletion: false
-    editable: true
-    options:
-      path: /var/lib/grafana/dashboards
-```
-
----
-
-### 2. The Compose Mapping Layer  
-`docker-compose.yml`
-
-To mirror your host files directly into the sandbox namespace, the Grafana service definition mounts the workspace directories using the following relative paths:
-
-```yaml
-grafana:
-  image: grafana/grafana:latest
-  container_name: qa_grafana
-  ports:
-    - "3000:3000"
-  volumes:
-    - ./grafana/provisioning:/etc/grafana/provisioning
-    - ./grafana/dashboards:/var/lib/grafana/dashboards
+grafana/
+├── provisioning/
+│   ├── datasources/datasource.yml    # Prometheus datasource with fixed uid "Prometheus"
+│   └── dashboards/dashboards.yml     # Dashboard file provider
+└── dashboards/
+    └── network_dashboard.json        # The dashboard layout
 ```
 
 ---
 
 # 🔧 Troubleshooting
 
-Below are the engineering blocks and configuration rules established during the implementation of the telemetry dashboard system.
+Below are the issues encountered, and how they were resolved, while building the telemetry dashboard.
 
 ---
 
@@ -210,11 +224,11 @@ stat /var/lib/grafana/dashboards: no such file or directory
 
 ### Root Cause
 
-Docker volume states are evaluated strictly at container initialization. Modifying `docker-compose.yml` or the file-tree pathing after the container has been built and applying a standard `docker compose restart` does not apply updated mount instructions.
+Docker applies volume mounts only when a container is created. If you change `docker-compose.yml` or the mounted paths after creation, a plain `docker compose restart` keeps the old mounts.
 
 ### Resolution
 
-Destroy the active namespace cache and rebuild the structural layers with explicit recreation flags:
+Tear the containers down and recreate them so the new mounts are applied:
 
 ```bash
 docker compose down
@@ -231,11 +245,11 @@ The container paths are validated but dashboards remain unrendered.
 
 ### Root Cause
 
-Inside the container architecture, Grafana drops root privileges and operates under a generic non-root UID (`472`). If project files are manipulated locally by the host user or via `sudo`, read authorization flags can become restricted, locking out the internal parser.
+Inside the container, Grafana drops root privileges and runs as a non-root user (UID `472`). If the project files were modified by another host user or with `sudo`, their permissions may block that user from reading them.
 
 ### Resolution
 
-Open recursive read access to the shared dashboard volume path:
+Grant read access to the dashboard directory recursively:
 
 ```bash
 chmod -R 755 grafana/dashboards/
@@ -243,23 +257,23 @@ chmod -R 755 grafana/dashboards/
 
 ---
 
-## 🧩 Issue 3: Architectural Layout Schema Incompatibilities (Grafana Scenes Engine)
+## 🧩 Issue 3: Dashboard JSON Schema Incompatibility (Grafana Scenes)
 
 ### Symptom
 
-Saving or copy-pasting the raw text from Grafana's newer JSON Model screen back to your host file causes the dashboard to immediately disappear with a **"Dashboard Not Found"** state upon restart.
+Copying the JSON from Grafana's newer JSON Model screen into the provisioned file makes the dashboard disappear (**"Dashboard Not Found"**) after a restart.
 
 ### Root Cause
 
-Modern Grafana user interfaces use a nested dictionary-backed layout engine called **Scenes** (`"elements": {}`, `"kind": "Panel"`).
+Newer Grafana UIs export dashboards in a nested layout format called **Scenes** (`"elements": {}`, `"kind": "Panel"`).
 
-However, Grafana’s file provisioning loader expects a legacy flat array model (`"panels": []`) to boot resources.
+Grafana's file provisioning loader, however, expects the classic flat array model (`"panels": []`).
 
-When it encounters unmapped top-level keys without standard boot metadata flags (`id: null`, `uid`, `schemaVersion`), it silently drops the file from memory.
+If the file contains unrecognized top-level keys and lacks the standard fields (`id: null`, `uid`, `schemaVersion`), Grafana silently skips it.
 
 ### Resolution
 
-Standardize the local tracking file to use backward-compatible schema models mapping metrics directly to explicit targets:
+Keep the provisioned file in the classic format, with each panel's queries listed in its `targets`:
 
 ```json
 {
@@ -281,24 +295,24 @@ The dashboard page loads correctly and panels display their borders and titles, 
 
 ### Root Cause
 
-High-level dashboard layouts copied across instances often include:
+Dashboards copied between Grafana instances often reference the datasource through:
 
-- Randomized hardcoded UID strings  
+- A randomly generated UID
   (e.g. `"PBFA97CFB590B2093"`)
 
 **or**
 
-- Variable bindings like:
+- A template variable such as:
 
 ```text
 ${DS_PROMETHEUS}
 ```
 
-These fail to bind against the localized Grafana data connection.
+Neither resolves to the datasource in the local Grafana instance.
 
 ### Resolution
 
-Hardcode the connection definition block inside every panel target array within `network_dashboard.json` so it explicitly references the literal Prometheus datasource name exactly as registered in Grafana:
+Provision the datasource with a **fixed UID** (`uid: Prometheus` in `datasource.yml`) and reference that UID from every panel target in `network_dashboard.json`:
 
 ```json
 "targets": [

@@ -1,0 +1,40 @@
+name: Network QA Suite
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      PUSHGATEWAY_URL: "" # No telemetry stack in CI
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate mock captures
+        run: |
+          python mock_generation_scripts/generate_normal_mock_pcap.py
+          python mock_generation_scripts/generate_stress_mock_pcap.py
+          python mock_generation_scripts/generate_exploratory_mock_pcap.py
+
+      - name: Run test suite
+        run: pytest -v --junitxml=junit.xml
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            junit.xml
+            test_results/
+            mock_data/

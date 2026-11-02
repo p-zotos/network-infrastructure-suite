@@ -13,12 +13,13 @@
     "real": {
       "pcap_path": "pcaps/real_traffic.pcap",
       "retrans_threshold": 1.0,
-      "condition": "less_than"
+      "condition": "less_than",
+      "require_clean_close": false
     },
     "exploratory": {
       "pcap_path": "mock_data/mock_exploratory_data.pcap",
-      "retrans_threshold": 3.0,
-      "condition": "less_than"
+      "ground_truth_path": "mock_data/mock_exploratory_data.truth.json",
+      "condition": "matches_ground_truth"
     }
   }
 }

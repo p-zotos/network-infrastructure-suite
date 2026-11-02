@@ -1,7 +1,7 @@
-import sys
+import argparse
 import os
-from scapy.all import sniff, wrpcap
-from datetime import datetime
+import sys
+from scapy.all import sniff, wrpcap, conf
 
 def live_network_capture(interface, duration_seconds, output_path):
     """
@@ -27,18 +27,6 @@ def live_network_capture(interface, duration_seconds, output_path):
             timeout=duration_seconds,
             filter="tcp"
         )
-        
-        packet_count = len(captured_packets)
-        print(f"[+] Capture window completed. Intercepted {packet_count} TCP packets.")
-
-        if packet_count == 0:
-            print("[WARN] No TCP sequences detected during this timeframe window.")
-            print("[WARN] Ensure active network traffic is flowing through the interface.")
-        
-        # Write memory frame buffers straight to raw PCAP storage
-        wrpcap(output_path, captured_packets)
-        print(f"[SUCCESS] Live network trace asset exported seamlessly to: {output_path}")
-
     except PermissionError:
         print("[ERROR] Insufficient privileges! Packet sniffing requires root/sudo access.")
         sys.exit(1)
@@ -46,22 +34,28 @@ def live_network_capture(interface, duration_seconds, output_path):
         print(f"[ERROR] An unexpected error occurred during capture: {e}")
         sys.exit(1)
 
-if __name__ == "__main__":
-    # --- Configuration Blocks ---
-    TARGET_INTERFACE = "ens33" 
-    CAPTURE_DURATION = 15  # Timeframe window in seconds
-    TARGET_OUTPUT = "pcaps/real_traffic.pcap"
-    # ----------------------------
+    packet_count = len(captured_packets)
+    print(f"[+] Capture window completed. Intercepted {packet_count} TCP packets.")
 
-    # Allow overriding timeframe via command line execution flags
-    if len(sys.argv) > 1:
-        try:
-            CAPTURE_DURATION = int(sys.argv[1])
-        except ValueError:
-            print(f"[WARN] Invalid duration argument. Falling back to default: {CAPTURE_DURATION}s")
+    if packet_count == 0:
+        # Fail loudly instead of handing the test suite an empty or fake trace
+        print("[ERROR] No TCP sequences detected during this timeframe window.")
+        print("[ERROR] Ensure active network traffic is flowing through the interface.")
+        sys.exit(1)
+
+    # Write memory frame buffers straight to raw PCAP storage
+    wrpcap(output_path, captured_packets)
+    print(f"[SUCCESS] Live network trace asset exported to: {output_path}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Capture live TCP traffic into a PCAP file.")
+    parser.add_argument("--interface", default=str(conf.iface), help="Interface to sniff (default: system default route interface)")
+    parser.add_argument("--duration", type=int, default=15, help="Capture window in seconds (default: 15)")
+    parser.add_argument("--output", default="pcaps/real_traffic.pcap", help="Output PCAP path")
+    args = parser.parse_args()
 
     live_network_capture(
-        interface=TARGET_INTERFACE,
-        duration_seconds=CAPTURE_DURATION,
-        output_path=TARGET_OUTPUT
+        interface=args.interface,
+        duration_seconds=args.duration,
+        output_path=args.output
     )

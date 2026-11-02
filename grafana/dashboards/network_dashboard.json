@@ -9,7 +9,7 @@
   "graphTooltip": 1,
   "refresh": "5s",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -19,6 +19,7 @@
       "id": 1,
       "type": "bargauge",
       "title": "Retransmission Rate",
+      "description": "Retransmitted data segments as a percentage of all data segments. Stress mode is expected to be red.",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
@@ -41,12 +42,16 @@
       },
       "fieldConfig": {
         "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 15,
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 5 }
             ]
           }
         }
@@ -55,7 +60,8 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Infrastructure Footprint",
+      "title": "Test Runner Host Footprint",
+      "description": "CPU and RAM of the machine executing the suite, sampled at analysis time.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
@@ -81,6 +87,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "unit": "percent",
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
@@ -107,21 +114,104 @@
         }
       ],
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
+        "colorMode": "background",
+        "graphMode": "none",
         "justifyMode": "auto",
-        "textMode": "auto"
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "values": false
+        }
       },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "FAIL", "index": 0 },
+                "1": { "text": "PASS", "index": 1 }
+              }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
             ]
           }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Out-of-Order & Mean Jitter",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "editorMode": "code",
+          "expr": "qa_out_of_order_rate",
+          "legendFormat": "{{mode}} - out-of-order %",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "editorMode": "code",
+          "expr": "qa_mean_jitter_ms",
+          "legendFormat": "{{mode}} - jitter ms",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Last Run",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "editorMode": "code",
+          "expr": "push_time_seconds{job=\"network_qa_suite\"} * 1000",
+          "legendFormat": "{{mode}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
         }
       }
     }

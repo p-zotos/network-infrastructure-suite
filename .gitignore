@@ -1,4 +1,17 @@
 venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 sample.pcap
+
+# Never commit packet captures, wherever they are saved: they can contain private traffic
+*.pcap
+*.pcapng
+
+# Generated on every run: mock captures, live captures and telemetry reports
+mock_data/
+pcaps/
+test_results/
+
+# Local secrets (e.g. GRAFANA_ADMIN_PASSWORD)
+.env

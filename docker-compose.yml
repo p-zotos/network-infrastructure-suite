@@ -1,29 +1,32 @@
-version: '3.8'
-
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.2.1
     container_name: qa_prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      # Bound to localhost only: never expose the stack to the local network
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - pushgateway
 
   pushgateway:
-    image: prom/pushgateway:latest
+    image: prom/pushgateway:v1.11.0
     container_name: qa_pushgateway
     ports:
-      - "9091:9091"
+      # Accepts unauthenticated writes, so it must stay local
+      - "127.0.0.1:9091:9091"
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.5.2
     container_name: qa_grafana
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # Override via a .env file or the shell: GRAFANA_ADMIN_PASSWORD=... docker compose up -d
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
     depends_on:
       - prometheus

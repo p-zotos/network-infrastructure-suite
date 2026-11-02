@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    uid: Prometheus # Fixed UID referenced by every panel in network_dashboard.json
     type: prometheus
     access: proxy
     url: http://prometheus:9090
